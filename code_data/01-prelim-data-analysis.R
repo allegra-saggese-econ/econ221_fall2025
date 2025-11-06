@@ -1,14 +1,14 @@
 # author: Allegra Saggese
-# last updated: 28 Ott 2025
+# last updated: 02 nov 2025
 # purpose: prelim analysis for macro measurement 
 library(tidyr)
 library(dplyr)
 
+
+
+
 ## LOAD IN DATASETS 
 owd    <- getwd()
-target <- file.path(owd, "code_data")
-if (!dir.exists(target)) stop("Folder 'code_data' not found in current WD.")
-setwd(target)
 
 # find files
 paths <- list.files(pattern = "\\.(csv|xlsx)$", ignore.case = TRUE, full.names = TRUE)
@@ -31,7 +31,9 @@ datasets <- setNames(lapply(paths, read_any),
 # back to original WD
 setwd(owd)
 
-# what you got
+# what we get 
 names(datasets)
+
+
 
 
