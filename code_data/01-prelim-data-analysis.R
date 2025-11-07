@@ -243,7 +243,30 @@ ggplot(gdp_df_v2, aes(x = year, y = current_us_dollars)) +
 pce <- "CA-PCE-annual-FRED-FED"
 pce_df <- datasets[[pce]]
 
+pce_df$observation_date <- as.Date(pce_df$observation_date, format = "%Y-%d-%m")
+e <- pce_df$observation_date
 
+# calendar month and year
+m <- ifelse(is.na(e), NA_integer_, as.integer(format(e, "%m"))) # STILL NOT WORKING 
+y <- ifelse(is.na(e), NA_integer_, as.integer(format(e, "%Y")))
+q <- ifelse(is.na(e), NA_character_, paste0("Q", ((m - 1L - 6L) %% 12L) %/% 3L + 1L))
+fy <- ifelse(is.na(e), NA_integer_, ifelse(m >= 7L, y + 1L, y))
 
+# attach columns back
+pce_df$month          <- m # WRONG WRONG 
+pce_df$year           <- y
+pce_df$fiscal_quarter <- q
+pce_df$fiscal_year    <- fy
+
+# save back into the list
+datasets[[pce]] <- pce_df
+class(pce_df$CAPCE)
+
+# plot against time 
+ggplot(pce_df, aes(x = year, y = CAPCE)) +
+  geom_line() +
+  geom_point() +
+  labs(x = "Year", y = "CA PCE (US dollars)") +
+  theme_minimal()
 
 
