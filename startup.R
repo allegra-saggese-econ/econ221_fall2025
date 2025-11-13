@@ -19,6 +19,10 @@ library(httr)
 library(jsonlite) # CA tax data 
 
 
+# -----------------------------------------------------------------------
+###### ###### ###### ###### DIRECTORY NAMES  ###### ###### ###### ###### 
+# -----------------------------------------------------------------------
+
 # set working directory to load in data 
 owd    <- getwd()
 target <- file.path(getwd(), "code_data")
@@ -26,11 +30,12 @@ if (!dir.exists(target)) stop("Missing 'code_data' inside: ", getwd())
 setwd(target)
 getwd()
 
+# add in input / output directory for visualizations --- pref naming + output folder 
+
 
 # -----------------------------------------------------------------------
 ###### ###### ###### ######  LOAD IN DATASETS  ###### ###### ###### ###### 
 # -----------------------------------------------------------------------
-
 
 
 # find files
@@ -55,5 +60,6 @@ datasets <- setNames(lapply(paths, read_any),
 # back to original WD
 setwd(owd)
 
-##### WILL NEED TO ADJUST TO READ IN THE DATASETS THAT ARE EXCEL + SHEET --- THIS IS CRASHING THE READ IN HELPER 
+##### WILL NEED TO ADJUST TO READ IN THE DATASETS THAT ARE EXCEL + SHEET 
+##--- THIS IS CRASHING THE READ IN HELPER 
 
