@@ -694,16 +694,22 @@ combined_df <- combined_df %>%
 
 
 ggplot(combined_df, aes(x = year)) +
-  geom_line(aes(y = est_tax_amt_w_public/1000000, color = "Est. w/ public admin"), linewidth = 1.1) +
-  geom_line(aes(y = real_tax_amt_total/1000000, color = "Reported total"), linewidth = 1.1) +
-  geom_point(aes(y = est_tax_amt_w_public/1000000, color = "Est. w/ public admin"), size = 2) +
-  geom_point(aes(y = real_tax_amt_total/1000000, color = "Reported total"), size = 2) +
+  geom_line(aes(y = est_tax_amt_w_public/1000000, color = "PCE est. w/ public admin"), linewidth = 1.1) +
+  geom_line(aes(y = real_tax_amt_total/1000000, color = "CA reported trans."), linewidth = 1.1) +
+  geom_point(aes(y = est_tax_amt_w_public/1000000, color = "PCE est. w/ public admin"), size = 2) +
+  geom_point(aes(y = real_tax_amt_total/1000000, color = "CA reported trans."), size = 2) +
   scale_y_continuous(labels = label_comma()) +
+  scale_color_manual(
+    values = c(
+      "PCE est. w/ public admin" = "#f8766d",   # blue (example)
+      "CA reported trans." = "#619cff"              # red (example)
+    )
+  ) +
   labs(
     x = "Year",
-    y = "Taxable Transactions (millions USD)",
+    y = "Taxable transactions (millions USD)",
     color = "",
-    title = "Taxable Transactions (incl. Public Admin) estimate v. reported"
+    title = "Total amount of taxable sales estimate v. reported"
   ) +
   theme_minimal()
 
