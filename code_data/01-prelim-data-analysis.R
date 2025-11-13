@@ -4,56 +4,10 @@
 
 # execute for packages and files 
 source("startup.R")
-# -----------------------------------------------------------------------
-###### ###### ###### ######  LOAD IN PACKAGES  ###### ###### ###### ###### 
-# -----------------------------------------------------------------------
-
-library(tidyr)
-library(dplyr)
-library(ggplot2)
-library(tidycensus) # census data 
-library(purrr)
-library(readxl)
-library(httr)
-library(jsonlite) # CA tax data 
-library(stringr)
-library(scales)
-
-# -----------------------------------------------------------------------
-###### ###### ###### ######  LOAD IN DATASETS  ###### ###### ###### ###### 
-# -----------------------------------------------------------------------
-
-owd    <- getwd()
-target <- file.path(getwd(), "code_data")
-if (!dir.exists(target)) stop("Missing 'code_data' inside: ", getwd())
-setwd(target)
-getwd()
-
-# find files
-paths <- list.files(pattern = "\\.(csv|xlsx)$", ignore.case = TRUE, full.names = TRUE)
-
-# read helper
-read_any <- function(p){
-  ext <- tolower(tools::file_ext(p))
-  if (ext == "csv") {
-    read.csv(p, stringsAsFactors = FALSE, check.names = FALSE)
-  } else if (ext == "xlsx") {
-    as.data.frame(readxl::read_excel(p, sheet = 1), check.names = FALSE)
-  } else {
-    NULL
-  }
-}
-
-datasets <- setNames(lapply(paths, read_any),
-                     tools::file_path_sans_ext(basename(paths)))
-
-# back to original WD
-setwd(owd)
-
-# what we get 
+# inspect data sets 
 names(datasets)
 
-# data review
+# data review --- NEED TO FIX HELPER - CRASH W/ EXCEL TAKING ONE SHEET 
 stopifnot(is.list(datasets), length(names(datasets)) == length(datasets))
 
 is_intlike <- function(x) is.numeric(x) && all(is.na(x) | x == floor(x))
@@ -176,6 +130,10 @@ year_cov <- do.call(rbind, lapply(names(datasets), function(nm) {
 if (!is.null(year_cov)) utils::write.csv(year_cov, "00_year_ranges.csv", row.names = FALSE)
 
 
+
+
+
+
 # -----------------------------------------------------------------------
 ###### ###### ###### ######  DATA CLEANING  ###### ###### ###### ###### 
 # -----------------------------------------------------------------------
@@ -290,7 +248,7 @@ ggplot(pce_df, aes(x = year, y = CAPCE)) +
 
 # DF 4  ------ LOCAL TAX RATES IN CA 
 
-sales_tax_rates <- read_excel("code_data/SalesTaxRates.xlsx")
+sales_tax_rates <- read_excel("code_data/SalesTaxRates.xlsx") # DONT RE-READ IN - TAKE FROM DATAFRAME
 colnames(sales_tax_rates) <- as.character(unlist(sales_tax_rates[1, ]))
 sales_tax_rates <- sales_tax_rates[-1, ]
 names(sales_tax_rates) <- tolower(names(sales_tax_rates))
@@ -314,6 +272,7 @@ sales_tax_hist <- data.frame(
 )
 
 # taken from https://cdtfa.ca.gov/taxes-and-fees/sales-use-tax-rates-history.htm#note
+#### MOVE THIS TO A NEW SCRIPT - MANUAL DATA CREATIONS 
 sales_tax_hist$eff_rate <- c(
   .0725, .0725, .0725, .0725, .0725, .0725, .0725, .0725,
   .0750, .0750, .0750, .0750, .0725, .0725, .0825, .0825, 
@@ -352,6 +311,7 @@ incidence_avg <- c(
 # DF 5 ------- MEDIAN INCOME OVER TIME 
 years <- setdiff(2005:2023, 2020)   # skip 2020
 
+# NOTE THE API-CALLED DATA IS NOT IN DATAFRAMES -- MOVE THIS TO A SEPARATE SCRIPT TO CALL ACS DATA SEP AND STORE 
 acs_income <- map_dfr(years, ~
                         get_acs(
                           geography = "county",
@@ -380,7 +340,7 @@ acs_income_q <- acs_income_q %>%
 
 
 # DF 6 ------- BLS CE by QUINTILE for CA 
-path <- "code_data/BLS_CES_tables_per_yr.xlsx"
+path <- "code_data/BLS_CES_tables_per_yr.xlsx" # DONT RE-READ IN - TAKE FROM DATAFRAME
 sheets <- excel_sheets(path)
 
 bls_df <- map_dfr(sheets, ~
