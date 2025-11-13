@@ -2,6 +2,8 @@
 # last updated: 06 nov 2025
 # purpose: prelim analysis for macro measurement 
 
+# execute for packages and files 
+source("startup.R")
 # -----------------------------------------------------------------------
 ###### ###### ###### ######  LOAD IN PACKAGES  ###### ###### ###### ###### 
 # -----------------------------------------------------------------------
@@ -986,3 +988,36 @@ ggplot(evade_compare, aes(x = year, y = evade_ratio, color = version)) +
     title = "Comparison of California EVADE Ratios Across Model Versions"
   ) +
   theme_minimal()
+
+
+# EVADE YoY change vs. GDP YoY change 
+evade_yoy <- EVADE_full %>%
+  select(year, evade_ratio, gdp_nominal_dollars) %>%
+  rename(evade_ratio_v1 = evade_ratio, gdp_v1 = gdp_nominal_dollars) %>%
+  left_join(
+    EVADE_full_v2 %>%
+      select(year, evade_ratio, gdp_nominal_dollars) %>%
+      rename(evade_ratio_v2 = evade_ratio, gdp_v2 = gdp_nominal_dollars),
+    by = "year"
+  ) %>%
+  arrange(year) %>%
+  mutate(
+    yoy_evade_v1 = 100 * (evade_ratio_v1 / lag(evade_ratio_v1) - 1),
+    yoy_evade_v2 = 100 * (evade_ratio_v2 / lag(evade_ratio_v2) - 1),
+    yoy_gdp_v1   = 100 * (gdp_v1 / lag(gdp_v1) - 1)
+  )
+
+# show only the relevant columns
+evade_yoy %>%
+  select(year, yoy_evade_v1, yoy_evade_v2, yoy_gdp_v1)
+
+# plot CHANGE 
+plot_yoy <- evade_yoy %>%
+  select(year, yoy_evade_v1, yoy_evade_v2, yoy_gdp_v1) %>%
+  pivot_longer(
+    cols = starts_with("yoy_"),
+    names_to = "series",
+    values_to = "yoy_change"
+  )
+
+
