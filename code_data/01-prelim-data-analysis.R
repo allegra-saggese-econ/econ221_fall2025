@@ -1,9 +1,14 @@
 # author: Allegra Saggese
-# last updated: 06 nov 2025
+# last updated: 25 nov 2025
 # purpose: prelim analysis for macro measurement 
 
-# execute for packages and files 
-source("startup.R")
+# execute for packages and files - start w/ set working directory to load in data 
+owd    <- getwd()
+target <- file.path(getwd(), "code_data")
+if (!dir.exists(target)) stop("Missing 'code_data' inside: ", getwd())
+setwd(target)
+getwd()
+source("00-startup.R")
 # inspect data sets 
 names(datasets)
 
