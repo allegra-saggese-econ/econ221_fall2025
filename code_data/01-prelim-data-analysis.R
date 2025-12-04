@@ -181,6 +181,9 @@ datasets[[nm]] <- tax_q_df
 str(datasets[[nm]][, c("observation_date","month","year","fiscal_quarter","fiscal_year")])
 head(datasets[[nm]][, c("observation_date","month","year","fiscal_quarter","fiscal_year")])
 
+tax_q_df_collapse <- tax_q_df %>%
+  group_by(year) %>%
+  summarise(total_tax_year = sum(total_tax_collected_CA, na.rm = TRUE))
 
 # early plot of tax collected in california over time 
 ggplot(tax_q_df, aes(x = observation_date, y = total_tax_collected_CA)) +
@@ -194,7 +197,7 @@ ggplot(tax_q_df, aes(x = observation_date, y = total_tax_collected_CA)) +
 collected_tax <- "CA-FED-taxable_sales_collected"
 tax_coll_df <- datasets[[collected_tax]]
 names(tax_coll_df) <- tolower(names(tax_coll_df))
-tax_coll_df$amount_mills_usd <- tax_coll_df$amount_thousands_usd/10 # create mil col for comparison
+tax_coll_df$amount_mills_usd <- tax_coll_df$amount_thousands_usd/1000 # create mil col for comparison
 
 
 # DF 1c ----- income tax in CA only 
@@ -227,15 +230,40 @@ str(datasets[[collected_inc_tax]][, c("observation_date","month","year","fiscal_
 head(datasets[[collected_inc_tax]][, c("observation_date","month","year","fiscal_quarter","fiscal_year")])
 
 inc_tax_coll_df <- inc_tax_coll_df[-(1:58), ] # start in 2000 (earlier years not useful)
-inc_tax_coll_df$amount_mills_usd <- inc_tax_coll_dff$amount_thousands_usd/10 # create mil col for comparison
+inc_tax_coll_df$amount_mills_usd <- inc_tax_coll_df$ca_income_tax_thousands_of_dollars/1000 # create mil col for comparison
 
-
+## PLOT ALL 3 LINES 
+ggplot() +
+  geom_line(data = inc_tax_coll_df,
+            aes(x = year, y = amount_mills_usd, color = "Income Tax"),
+            size = 1) +
+  geom_line(data = tax_coll_df,
+            aes(x = year, y = amount_mills_usd, color = "Sales Tax"),
+            size = 1) +
+  geom_line(data = tax_q_df_collapse,
+            aes(x = year, y = total_tax_year, color = "Total Tax"),
+            size = 1) +
+  labs(
+    x = "Year",
+    y = "Tax collected (millions USD)",
+    color = "FRED FED series"
+  ) +
+  theme_minimal()
 
 # DF 1d ----- UR unemployment rate in CA for biz cycle graph
 UR <- "CAUR"
 ur_df <- datasets[[UR]]
 names(ur_df) <- tolower(names(ur_df))
 
+ur_df$date <- as.Date(ur_df$observation_date, format = "%m/%d/%y")
+ur_df$year <- format(ur_df$date, "%Y")
+
+# create annual average for exploratory stats 
+ur_yearly <- ur_df %>%
+  group_by(year) %>%
+  summarise(urate_avg = mean(caur, na.rm = TRUE))
+
+ur_yearly$year <- as.numeric(ur_yearly$year) # make numeric for plot 
 
 
 # DF 2 ------ AGGREGATE GDP DATA 
@@ -259,18 +287,11 @@ gdp_df_v2$annual_pct_change <- as.numeric(gdp_df_v2$annual_pct_change)
 
 
 # plot GDP over time (pct change, and total - aggregate)
-ggplot(gdp_df_v2, aes(x = year, y = annual_pct_change)) +
+ggplot(gdp_df_v2, aes(x = year, y = gdp_nominal_dollars)) +
   geom_line() +
   geom_point() +
-  labs(x = "Year", y = "Percentage change in GDP per year") +
+  labs(x = "Year", y = "GDP (millions USD)") +
   theme_minimal()
-
-ggplot(gdp_df_v2, aes(x = year, y = current_us_dollars)) +
-  geom_line() +
-  geom_point() +
-  labs(x = "Year", y = "GDP (US dollars)") +
-  theme_minimal()
-
 
 
 # DF 3 ------ Personal Consumption Expenditure (PCE) for CA
@@ -301,7 +322,110 @@ class(pce_df$CAPCE)
 ggplot(pce_df, aes(x = year, y = CAPCE)) +
   geom_line() +
   geom_point() +
-  labs(x = "Year", y = "CA PCE (US dollars)") +
+  labs(x = "Year", y = "CA PCE (millions US dollars)") +
+  theme_minimal()
+
+
+### PLOT GDP AND STUFF 
+ggplot() +
+  
+  # ---- PCE ----
+geom_line(data = pce_df,
+          aes(x = year, y = CAPCE, color = "PCE"),
+          size = 1) +
+  geom_point(data = pce_df,
+             aes(x = year, y = CAPCE, color = "PCE"),
+             size = 2) +
+  
+  # ---- GDP ----
+geom_line(data = gdp_df_v2,
+          aes(x = year, y = gdp_nominal_dollars, color = "GDP"),
+          size = 1) +
+  geom_point(data = gdp_df_v2,
+             aes(x = year, y = gdp_nominal_dollars, color = "GDP"),
+             size = 2) +
+  
+  # ---- Axes ----
+scale_y_continuous(
+  name = "PCE & GDP (millions USD)")
+  # ---- Colors ----
+scale_color_manual(values = c(
+  "PCE" = "blue",
+  "GDP" = "red",
+  "Unemployment Rate" = "darkgreen"
+)) +
+  
+  # ---- Labels ----
+labs(
+  x = "Year",
+  color = "Series"
+) +
+  
+  theme_minimal()
+
+# create PCE - sales tax 
+df_merge <- merge(
+  inc_tax_coll_df |> dplyr::rename(pce = amount_mills_usd),
+  tax_coll_df     |> dplyr::rename(salestax = amount_mills_usd),
+  by = "year"
+)
+
+df_merge$diff_pce_sales <- df_merge$pce - df_merge$salestax
+
+
+### PLOT - unemployment vs change in GDP / PCE 
+ggplot(df_merge, aes(x = year, y = diff_pce_sales)) +
+  geom_line(color = "purple", size = 1.2) +
+  geom_point(color = "purple", size = 2) +
+  labs(
+    x = "Year",
+    y = "PCE – Sales Tax (millions USD)",
+    title = "Difference Between PCE and Sales Tax"
+  ) +
+  theme_minimal()
+
+
+## AGAINST UNEMPLOYMENT
+# scale unemployment so it fits on left axis
+scale_factor <- max(df_merge$diff_pce_sales, na.rm = TRUE) / 
+  max(ur_yearly$urate_avg, na.rm = TRUE)
+
+# restrict sample
+ur_filtered <- ur_yearly %>% 
+  dplyr::filter(year %in% df_merge$year)
+
+ggplot() +
+  # ----- Difference Line (PCE – Sales Tax) -----
+geom_line(data = df_merge,
+          aes(x = year, y = diff_pce_sales, color = "PCE – Sales Tax"),
+          size = 1.2) +
+  geom_point(data = df_merge,
+             aes(x = year, y = diff_pce_sales, color = "PCE – Sales Tax"),
+             size = 2) +
+  
+  # ----- Unemployment Rate (scaled) -----
+geom_line(data = ur_filtered,
+          aes(x = year, y = urate_avg * scale_factor, color = "Avg Unemployment"),
+          size = 1, linetype = "dashed") +
+  
+  # ----- Axes -----
+scale_y_continuous(
+  name = "PCE – Sales Tax (millions USD)",
+  sec.axis = sec_axis(~ . / scale_factor,
+                      name = "Unemployment Rate (%)")
+) +
+  
+  # ----- Legend Colors -----
+scale_color_manual(values = c(
+  "PCE – Sales Tax" = "purple",
+  "Avg Unemployment" = "darkgreen"
+)) +
+  
+  labs(
+    x = "Year",
+    color = "Series",
+    title = "PCE - collected sales vs. unemployment rate"
+  ) +
   theme_minimal()
 
 
