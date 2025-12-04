@@ -24,10 +24,11 @@ library(jsonlite) # CA tax data
 # -----------------------------------------------------------------------
 
 # set working directory to load in data 
-owd    <- getwd()
-target <- file.path(getwd(), "code_data")
-if (!dir.exists(target)) stop("Missing 'code_data' inside: ", getwd())
-setwd(target)
+if (basename(owd) != "code_data") {
+  target <- file.path(owd, "code_data")
+  if (!dir.exists(target)) stop("Missing 'code_data' inside: ", owd)
+  setwd(target)
+}
 getwd()
 
 # add in input / output directory for visualizations --- pref naming + output folder 
