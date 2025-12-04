@@ -3,7 +3,6 @@
 # purpose: final analysis for macro measurement 
 
 
-
 owd <- getwd()
 # if current folder is not 'code_data', move into it
 if (basename(owd) != "code_data") {
@@ -17,12 +16,17 @@ source("00-startup.R")
 # inspect data sets 
 names(datasets)
 
-# data review --- NEED TO FIX HELPER - CRASH W/ EXCEL TAKING ONE SHEET 
+# -----------------------------------------------------------------------
+###### ###### ###### ######  PRE-ANALYSIS: SUFFICIENT DATA UPLOAD   ###### ###### ###### ###### 
+# -----------------------------------------------------------------------
+
+# data review --- check to ensure sheets all loaded - note manual edits made to the data 
 stopifnot(is.list(datasets), length(names(datasets)) == length(datasets))
 
 is_intlike <- function(x) is.numeric(x) && all(is.na(x) | x == floor(x))
 likely_year_colnames <- function(nm) grepl("(^|_)(year|yr)(_|$)", nm, ignore.case = TRUE)
 
+# scan for relevant col names
 scan_year_cols <- function(df) {
   by_name <- names(df)[likely_year_colnames(names(df))]
   by_vals <- names(df)[sapply(df, function(x)
@@ -30,6 +34,7 @@ scan_year_cols <- function(df) {
   unique(c(by_name, by_vals))
 }
 
+# try to ID relevant cols across cols - although we're going to use a manual approach
 key_candidates <- function(df) {
   keys <- c("year","Year","YR","FIPS","STATEFP","STATE","state",
             "county","County","county_name","NAICS","naics",
@@ -37,6 +42,7 @@ key_candidates <- function(df) {
   intersect(keys, names(df))
 }
 
+# function to review cols quickly and their names 
 peek_columns <- function(df, n_show = 40) {
   cls <- sapply(df, function(x) paste(class(x), collapse = "|"))
   nunq <- sapply(df, function(x) length(unique(x[!is.na(x)])))
@@ -54,6 +60,7 @@ peek_columns <- function(df, n_show = 40) {
   out[seq_len(min(nrow(out), n_show)), , drop = FALSE]
 }
 
+# check years on data 
 year_ranges <- function(df, ycols) {
   if (!length(ycols)) return(NULL)
   do.call(rbind, lapply(ycols, function(yc) {
@@ -75,6 +82,7 @@ small_cats <- function(df, max_levels = 30) {
   do.call(rbind, out)
 }
 
+# big review of datasets 
 explore_dataset <- function(nm, df, show_rows = 3) {
   cat("\n", strrep("=", 78), "\n", sep = "")
   cat("DATASET: ", nm, "\n", sep = "")
@@ -106,7 +114,7 @@ explore_dataset <- function(nm, df, show_rows = 3) {
   }
 }
 
-# run on all datasets
+# run on all datasets -- load in the datasets to review ranges of years 
 invisible(lapply(names(datasets), function(nm) explore_dataset(nm, datasets[[nm]])))
 
 # consolidate the dictionaries 
@@ -125,6 +133,7 @@ make_dictionary <- function(datasets) {
   }))
 }
 
+# browse universe of variables --- although its not so standard - this doesn't work 
 dict <- make_dictionary(datasets)
 dict$na_pct <- round(100 * dict$n_na / pmax(dict$n, 1), 2)
 utils::write.csv(dict, "00_column_dictionary.csv", row.names = FALSE)
@@ -141,14 +150,11 @@ if (!is.null(year_cov)) utils::write.csv(year_cov, "00_year_ranges.csv", row.nam
 
 
 
-
-
-
 # -----------------------------------------------------------------------
 ###### ###### ###### ######  DATA CLEANING  ###### ###### ###### ###### 
 # -----------------------------------------------------------------------
 
-# DF 1a ------ TAX COLLECTION DATA (TOTAL)
+# DF 1a ------ TAX COLLECTION DATA (TOTAL) FROM FRED FED (including income and corporate tax)
 nm <- "2023-FRED-CA-tax-collected"  
 tax_q_df <- datasets[[nm]]
 
@@ -183,9 +189,52 @@ ggplot(tax_q_df, aes(x = observation_date, y = total_tax_collected_CA)) +
   labs(x = "Year", y = "Tax collected (US millions $)") +
   theme_minimal()
 
+
 # DF 1b ----- sales and use tax in CA only 
-collected_tax <- read_xlsx("code_data/CA-taxable_sales_collected.xlsx")
-names(collected_tax) <- tolower(names(collected_tax))
+collected_tax <- "CA-FED-taxable_sales_collected"
+tax_coll_df <- datasets[[collected_tax]]
+names(tax_coll_df) <- tolower(names(tax_coll_df))
+tax_coll_df$amount_mills_usd <- tax_coll_df$amount_thousands_usd/10 # create mil col for comparison
+
+
+# DF 1c ----- income tax in CA only 
+collected_inc_tax <- "CAINCTAX"
+inc_tax_coll_df <- datasets[[collected_inc_tax]]
+names(inc_tax_coll_df) <- tolower(names(inc_tax_coll_df)) 
+
+
+# convert to date format so we parse out month, yr, and fiscal quarter
+inc_tax_coll_df$observation_date <- as.Date(inc_tax_coll_df$observation_date, format = "%m/%d/%y")
+d <- inc_tax_coll_df$observation_date
+
+# calendar month and year
+m <- ifelse(is.na(d), NA_integer_, as.integer(format(d, "%m")))
+y <- ifelse(is.na(d), NA_integer_, as.integer(format(d, "%Y")))
+q <- ifelse(is.na(d), NA_character_, paste0("Q", ((m - 1L - 6L) %% 12L) %/% 3L + 1L))
+fy <- ifelse(is.na(d), NA_integer_, ifelse(m >= 7L, y + 1L, y))
+
+# attach columns back
+inc_tax_coll_df$month          <- m
+inc_tax_coll_df$year           <- y
+inc_tax_coll_df$fiscal_quarter <- q
+inc_tax_coll_df$fiscal_year    <- fy
+
+# save back into the list
+datasets[[collected_inc_tax]] <- inc_tax_coll_df
+
+# quick check
+str(datasets[[collected_inc_tax]][, c("observation_date","month","year","fiscal_quarter","fiscal_year")])
+head(datasets[[collected_inc_tax]][, c("observation_date","month","year","fiscal_quarter","fiscal_year")])
+
+inc_tax_coll_df <- inc_tax_coll_df[-(1:58), ] # start in 2000 (earlier years not useful)
+inc_tax_coll_df$amount_mills_usd <- inc_tax_coll_dff$amount_thousands_usd/10 # create mil col for comparison
+
+
+
+# DF 1d ----- UR unemployment rate in CA for biz cycle graph
+UR <- "CAUR"
+ur_df <- datasets[[UR]]
+names(ur_df) <- tolower(names(ur_df))
 
 
 
@@ -453,7 +502,9 @@ merged_df_v2 <- merged_df %>%
   left_join(cty_pop_long, by = c("county", "year"))
 
 # estimated collectable revenue at the county level 
-merged_df_v2$est_tax_tocollect <- merged_df_v2$est_tax_rev * merged_df_v2$pop_est# create new col for taxable spend
+merged_df_v2$est_tax_tocollect <- merged_df_v2$est_tax_rev * merged_df_v2$pop_est # create new col for taxable spend
+
+# EXPORT THE MERGED dataset so data cleaning process isn't necessary next time 
 
 
 # -----------------------------------------------------------------------
@@ -663,6 +714,11 @@ combined_df <- combined_df %>%
     est_tax_amt_w_public = tot_taxable + public_admin_tax,
     diff_est_vs_model = est_tax_amt_w_public - real_tax_amt_total
   )
+
+
+# -----------------------------------------------------------------------
+###### ###### ###### ###### GRAPHICS  ###### ###### ###### ###### 
+# -----------------------------------------------------------------------
 
 
 ggplot(combined_df, aes(x = year)) +
